@@ -39,8 +39,8 @@ class PlanarTrussSupport(BaseSupport):
 """Definition of FEM nodes."""
 
 
-class BaseNode(ABC):
-    """Base class for a finite element method node."""
+class Node:
+    """A class representing a node of a structure."""
     def __init__(self, node_id: int, n_dims: int, coordinates: np.ndarray[np.float64] = None,
                  external_loads: np.ndarray[np.float64] = None, support: BaseSupport = None):
         if not len(coordinates) == n_dims:
@@ -121,10 +121,3 @@ class BaseNode(ABC):
 
     def get_support(self) -> BaseSupport:
         return self.support
-
-
-class PlanarTrussNode(BaseNode):
-
-    def __init__(self, node_id: int, coordinates: np.ndarray[np.float64], external_loads: np.ndarray[np.float64] = None,
-                 support: PlanarTrussSupport = None):
-        super().__init__(node_id, 2, coordinates, external_loads, support)

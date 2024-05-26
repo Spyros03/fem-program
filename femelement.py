@@ -11,7 +11,7 @@ from abc import ABC, abstractmethod
 
 class BaseElement(ABC):
     """A base class for a finite element method element."""
-    def __init__(self, element_id: int, n_dims: int, nodes: list[BaseNode], material: Material,
+    def __init__(self, element_id: int, n_dims: int, nodes: list[Node], material: Material,
                  properties: BaseProperties, intermediate_loads: list[BaseInterLoad] = None):
         """Constructor that declares and initializes the object's variables"""
         self.element_id = element_id
@@ -137,12 +137,12 @@ class BaseElement(ABC):
 
 class PlanarTrussElement(BaseElement):
     """Class of a planar truss element."""
-    def __init__(self, element_id: int, nodes: list[PlanarTrussNode], material: Material,
+    def __init__(self, element_id: int, n_dims: int, nodes: list[Node], material: Material,
                  properties: PlanarTrussProperties, intermediate_loads: list[BasePlanarTrussInterLoad] = None):
-        super().__init__(element_id, 2, nodes, material, properties, intermediate_loads)
+        super().__init__(element_id, n_dims, nodes, material, properties, intermediate_loads)
 
     def _calculate_length(self) -> np.float64:
-        """Implements the abstract mehtod and calculates the length of a planar truss."""
+        """Implements the abstract method and calculates the length of a planar truss."""
         return np.hypot(self.nodes[1].get_coordinates()[0] - self.nodes[0].get_coordinates()[0],
                         self.nodes[1].get_coordinates()[1] - self.nodes[0].get_coordinates()[1])
 
@@ -152,20 +152,39 @@ class PlanarTrussElement(BaseElement):
         dy = self.nodes[1].get_coordinates()[1] - self.nodes[0].get_coordinates()[1]
         sin_phi = dy/self.length
         cos_phi = dx/self.length
-        return np.array([[cos_phi, sin_phi, 0,       0],
-                         [-sin_phi, cos_phi, 0,       0],
-                         [0,       0,       cos_phi, sin_phi],
-                         [0,       0,      -sin_phi, cos_phi]], dtype=np.float64)
+        if self.n_dims == 2:
+            return np.array([[cos_phi, sin_phi, 0,       0],
+                             [-sin_phi, cos_phi, 0,       0],
+                             [0,       0,       cos_phi, sin_phi],
+                             [0,       0,      -sin_phi, cos_phi]], dtype=np.float64)
+        elif self.n_dims == 3:
+            return np.array([[cos_phi, sin_phi, 0, 0, 0, 0],
+                             [-sin_phi, cos_phi, 0, 0, 0, 0],
+                             [0, 0, 1, 0, 0, 0],
+                             [0, 0, 0, cos_phi, sin_phi, 0],
+                             [0, 0, 0, -sin_phi, cos_phi, 0],
+                             [0, 0, 0, 0, 0, 1]], dtype=np.float64)
+
+
 
     def _calculate_k(self) -> np.ndarray[np.float64]:
         """Calculates the stiffness matrix of a planar truss element."""
         E = self.material.get_e_young()
         A = self.properties.get_area()
         L = self.length
-        return E*A/L * np.array([[1, 0, -1, 0],
-                                 [0, 0,  0, 0],
-                                [-1, 0,  1, 0],
-                                 [0, 0,  0, 0]])
+        if self.n_dims == 2:
+            return E*A/L * np.array([[1, 0, -1, 0],
+                                     [0, 0,  0, 0],
+                                    [-1, 0,  1, 0],
+                                     [0, 0,  0, 0]])
+        if self.n_dims == 3:
+            return E * A / L * np.array([[1, 0, 0,-1, 0, 0],
+                                         [0, 0, 0, 0, 0, 0],
+                                         [0, 0, 0, 0, 0, 0],
+                                        [-1, 0, 0, 1, 0, 0],
+                                         [0, 0, 0, 0, 0, 0],
+                                         [0, 0, 0, 0, 0, 0]])
+
 
     def calculate_element_forces(self):
         """(Temporary) Returns the axial force of the element."""
@@ -175,3 +194,42 @@ class PlanarTrussElement(BaseElement):
     def print_internal_forces(self):
         """Temp method to get the outputs."""
         print("Element {:2d} axial load is {:9.4f} kN".format(self.element_id, float(self.axial_force)))
+
+
+class PlanarBeamElement(BaseElement):
+
+    def __init__(self, element_id: int, nodes: list[Node], material: Material,
+                 properties: PlanarBeamProperties, intermediate_loads: list[BasePlanarTrussInterLoad] = None):
+        super().__init__(element_id, 2, nodes, material, properties, intermediate_loads)
+
+    def _calculate_length(self) -> np.ndarray[np.float64]:
+        """Implements the abstract method and calculates the length of a planar beam."""
+        return np.hypot(self.nodes[1].get_coordinates()[0] - self.nodes[0].get_coordinates()[0],
+                        self.nodes[1].get_coordinates()[1] - self.nodes[0].get_coordinates()[1])
+
+    def _calculate_transformation_matrix(self) -> np.ndarray[np.float64]:
+        """Calculates the transformation matrix of a planar beam element"""
+        dx = self.nodes[1].get_coordinates()[0] - self.nodes[0].get_coordinates()[0]
+        dy = self.nodes[1].get_coordinates()[1] - self.nodes[0].get_coordinates()[1]
+        sin_phi = dy/self.length
+        cos_phi = dx/self.length
+        return np.array([[cos_phi, sin_phi, 0,        0,      0, 0],
+                         [-sin_phi, cos_phi, 0,        0,       0, 0],
+                         [0,       0,        1,        0,       0, 0],
+                         [0,       0,        0,  cos_phi, sin_phi, 0],
+                         [0,       0,        0, -sin_phi, cos_phi, 0],
+                         [0,       0,        0,        0,       0, 1]], dtype=np.float64)
+
+    def _calculate_k(self) -> np.ndarray[np.float64]:
+        """Calculates the stiffness matrix of a planar truss element."""
+        E = self.material.get_e_young()
+        A = self.properties.get_area()
+        I = self.properties.get_moment_of_inertia()
+        L = self.length
+        return np.array([[E*A/L,         0,          0,        -E*A/L,         0,          0],
+                         [0,       12*E*I/L/L/L,   6*E*I/L/L,      0,-12*E*I/L/L/L,  6*E*I/L/L],
+                         [0,          6*E*I/L/L,     4*E*I/L,      0,   -6*E*I/L/L,    2*E*I/L],
+                         [-E*A/L,             0,           0,  E*A/L,           0,           0],
+                         [0,      -12*E*I/L/L/L,  -6*E*I/L/L,      0, 12*E*I/L/L/L, -6*E*I/L/L],
+                         [0,          6*E*I/L/L,     2*E*I/L,      0,   -6*E*I/L/L,    4*E*I/L]], dtype=np.float64)
+

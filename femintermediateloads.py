@@ -29,10 +29,18 @@ class PlanarTrussAxialTemperatureDifference(BasePlanarTrussInterLoad):
         a = element.get_material().get_a_thermal()
         A = element.get_properties().get_area()
         DT = self.temp_diff
-        return np.array([[a * E * A * DT],
-                        [0],
-                        [- a * E * A * DT],
-                        [0]])
+        if element.n_dims == 2:
+            return np.array([[a * E * A * DT],
+                            [0],
+                            [- a * E * A * DT],
+                            [0]])
+        elif element.n_dims == 3:
+            return np.array([[a * E * A * DT],
+                             [0],
+                             [0],
+                             [- a * E * A * DT],
+                             [0],
+                             [0]])
 
 
 class PlanarTrussDefectiveMember(BasePlanarTrussInterLoad):
@@ -45,7 +53,15 @@ class PlanarTrussDefectiveMember(BasePlanarTrussInterLoad):
         L = element.get_length()
         A = element.get_properties().get_area()
         d = self.delta
-        return np.array([[- d * E * A / L],
-                        [0],
-                        [d * E * A / L],
-                        [0]])
+        if element.n_dims == 2:
+            return np.array([[- d * E * A / L],
+                            [0],
+                            [d * E * A / L],
+                            [0]])
+        elif element.n_dims == 3:
+            return np.array([[- d * E * A / L],
+                             [0],
+                             [0],
+                             [d * E * A / L],
+                             [0],
+                             [0]])

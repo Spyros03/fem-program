@@ -2,10 +2,12 @@
 
 import numpy as np
 
-from femanalysis import PlanarTrussFemAnalysis
+from femanalysis import PlanarFemAnalysis
 from femnodes import PlanarTrussSupport
 
-analysis = PlanarTrussFemAnalysis()
+n_dims = 2
+
+analysis = PlanarFemAnalysis(n_dims)
 
 i = 1
 j = 0

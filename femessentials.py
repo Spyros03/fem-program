@@ -31,3 +31,13 @@ class PlanarTrussProperties(BaseProperties):
 
     def get_area(self) -> np.float64:
         return self.area
+
+
+class PlanarBeamProperties(BaseProperties):
+
+    def __init__(self, name: str, area: np.float64, moment_of_inertia: np.float64):
+        super().__init__(name, area)
+        self.moment_of_inertia = moment_of_inertia
+
+    def get_moment_of_inertia(self) -> np.float64:
+        return self.moment_of_inertia

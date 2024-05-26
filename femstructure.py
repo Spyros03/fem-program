@@ -9,7 +9,7 @@ from femelement import *
 
 class BaseStructure(ABC):
     """A base class for a structure."""
-    def __init__(self, nodes: list[BaseNode], elements: list[BaseElement], n_dims: int):
+    def __init__(self, nodes: list[Node], elements: list[BaseElement], n_dims: int):
         """Constructor that declares and initializes all structures variables."""
         self.nodes = nodes
         self.elements = elements
@@ -171,10 +171,10 @@ class BaseStructure(ABC):
         return self.kmmm
 
 
-class PlanarTrussStructure(BaseStructure):
+class PlanarStructure(BaseStructure):
     """A class for a planar truss structure."""
-    def __init__(self, nodes: list[PlanarTrussNode], elements: list[PlanarTrussElement]):
-        super().__init__(nodes, elements, 2)
+    def __init__(self, nodes: list[Node], elements: list[PlanarTrussElement], n_dims: int):
+        super().__init__(nodes, elements, n_dims)
 
     def _calculate_rotation_matrices(self) -> list[np.ndarray[np.float64]]:
         """Calculated the rotations matrices due to a rotated support."""
