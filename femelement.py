@@ -134,11 +134,14 @@ class BaseElement(ABC):
     def get_arbar(self) -> np.ndarray[np.float64]:
         return self.arbar
 
+    def get_nodes(self) -> list[Node]:
+        return self.nodes
+
 
 class PlanarTrussElement(BaseElement):
     """Class of a planar truss element."""
     def __init__(self, element_id: int, n_dims: int, nodes: list[Node], material: Material,
-                 properties: PlanarTrussProperties, intermediate_loads: list[BasePlanarTrussInterLoad] = None):
+                 properties: PlanarTrussProperties, intermediate_loads: list[BaseInterLoad] = None):
         super().__init__(element_id, n_dims, nodes, material, properties, intermediate_loads)
 
     def _calculate_length(self) -> np.float64:
@@ -164,8 +167,6 @@ class PlanarTrussElement(BaseElement):
                              [0, 0, 0, cos_phi, sin_phi, 0],
                              [0, 0, 0, -sin_phi, cos_phi, 0],
                              [0, 0, 0, 0, 0, 1]], dtype=np.float64)
-
-
 
     def _calculate_k(self) -> np.ndarray[np.float64]:
         """Calculates the stiffness matrix of a planar truss element."""
@@ -198,9 +199,9 @@ class PlanarTrussElement(BaseElement):
 
 class PlanarBeamElement(BaseElement):
 
-    def __init__(self, element_id: int, nodes: list[Node], material: Material,
-                 properties: PlanarBeamProperties, intermediate_loads: list[BasePlanarTrussInterLoad] = None):
-        super().__init__(element_id, 2, nodes, material, properties, intermediate_loads)
+    def __init__(self, element_id: int, n_dims: int, nodes: list[Node], material: Material,
+                 properties: PlanarBeamProperties, intermediate_loads: list[BaseInterLoad] = None):
+        super().__init__(element_id, n_dims, nodes, material, properties, intermediate_loads)
 
     def _calculate_length(self) -> np.ndarray[np.float64]:
         """Implements the abstract method and calculates the length of a planar beam."""

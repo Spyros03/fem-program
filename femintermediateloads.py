@@ -12,14 +12,7 @@ class BaseInterLoad(ABC):
         pass
 
 
-class BasePlanarTrussInterLoad(BaseInterLoad):
-    """Base class for intermediate loads for planar truss members."""
-    @abstractmethod
-    def get_consolidation_actions(self, element) -> np.ndarray[np.float64]:
-        pass
-
-
-class PlanarTrussAxialTemperatureDifference(BasePlanarTrussInterLoad):
+class PlanarAxialTemperatureDifference(BaseInterLoad):
     """This class resembles an intermediate load due to a temperature difference."""
     def __init__(self, temp_diff: np.float64):
         self.temp_diff = temp_diff
@@ -43,7 +36,7 @@ class PlanarTrussAxialTemperatureDifference(BasePlanarTrussInterLoad):
                              [0]])
 
 
-class PlanarTrussDefectiveMember(BasePlanarTrussInterLoad):
+class PlanarDefectiveMember(BaseInterLoad):
     """This class resembles an intermediate load due a defective member."""
     def __init__(self, delta: np.float64):
         self.delta = delta
@@ -65,3 +58,38 @@ class PlanarTrussDefectiveMember(BasePlanarTrussInterLoad):
                              [d * E * A / L],
                              [0],
                              [0]])
+
+
+class PlanarUniformDistributedLoad(BaseInterLoad):
+
+    def __init__(self, load_value : np.float64):
+        self.load_value = load_value
+
+    def get_consolidation_actions(self, element):
+        q = self.load_value
+        l = element.get_length()
+        return np.array([[0],
+                         [q*l/2],
+                         [q*l*l/12],
+                         [0],
+                         [q*l/2],
+                         [q*l*l/12]])
+
+
+class PlanarLinearTemperatureDifference(BaseInterLoad):
+
+    def __init__(self, temperature_diff: np.float64):
+        self.temperature_diff = temperature_diff
+
+    def get_consolidation_actions(self, element):
+        DT = self.temperature_diff
+        h = element.get_properties().get_height()
+        I = element.get_properties().get_moment_of_inertia()
+        E = element.get_material().get_e_young()
+        a = element.get_material().get_a_thermal()
+        return np.array([[0],
+                         [0],
+                         [E*I*a*DT/h],
+                         [0],
+                         [0],
+                         [-E*I*a*DT/h]])
