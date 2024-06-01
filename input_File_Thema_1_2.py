@@ -49,7 +49,7 @@ analysis.add_element(13, 1, 7, "1", "1", DT)
 analysis.add_element(14, 7, 8, "1", "1", DT)
 analysis.add_element(15, 1, 8, "1", "1", DT)
 
-analysis.add_support(1, [True, False])
+analysis.add_support(1, [True, True])
 analysis.add_support(8, [False, True], angles=[30])
 
 analysis.add_nodal_load(4, 0, -2*Pload)

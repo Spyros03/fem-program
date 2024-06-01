@@ -6,6 +6,74 @@ import numpy as np
 from femnodes import *
 from femelement import *
 
+class IndexManager:
+
+    class NodeIndexProperties:
+
+        def __init__(self):
+            self.indexes = list()
+            self.connected_elements = 0
+            self.bounded_dofs = list()
+            self.already_connected_elements = 0
+
+    def __init__(self, nodes, elements, n_dims):
+        self.n_dims = 0
+        self.nodes = nodes
+        self.n_nodes = len(self.nodes)
+        self.elements = elements
+        self.node_dofs = list()
+        self.node_bounded_dofs = list()
+        self.element_dofs = list()
+        for i in range(self.n_nodes):
+            self.node_dofs.append(NodeIndexProperties())
+            self.node_bounded_dofs.append(list())
+            self.element_dofs.append(list())
+
+    def assign_node_dofs(self):
+        current_dof = 0
+        for inode, node in enumerate(self.nodes):
+            if node.get_freedoms() is None:
+                for idof in range(self.n_dims):
+                    self.node_dofs[inode].index.append(current_dof)
+                    current_dof += 1
+            else:
+                self.node_dofs[inode].connected_elements = self._get_number_of_connected_elements(node)
+                for idof in range(self.n_dims):
+                    if idof in node.get_freedoms():
+                        for i in range(self.node_dofs[inode].connected_elements):
+                            self.node_dofs[inode].index.append(current_dof)
+                            current_dof += 1
+                    else:
+                        self.node_dofs[inode].index.append(current_dof)
+                        current_dof += 1
+
+    def _assign_bounded_dofs(self) -> list[int]:
+        """Returns the global degrees of freedom that are bounded by the support of this node."""
+        for inode, node in enumerate(self.nodes):
+            if node.get_support() is None:
+                continue
+            if node.get_freedoms() is None:
+                for idof, restriction in enumerate(node.get_support().get_restrictions()):
+                    if restriction:
+                        self.node_dofs[inode].bounded_dofs.append(self.node_dofs[inode].index[idof])
+            else:
+                pass
+
+    def assign_element_dofs(self):
+        pass
+
+    def _get_number_of_connected_elements(self, node) -> int:
+        count = 0
+        for element in self.elements:
+            for element_node in element.get_nodes():
+                if element_node is node:
+                    count += 1
+        return count
+
+
+
+
+
 
 class BaseStructure(ABC):
     """A base class for a structure."""
@@ -26,7 +94,7 @@ class BaseStructure(ABC):
         self.s = self._calculate_s() #consolidation actions vector.
         self.p = self.p_ext - self.s #nodal loads for the equivalent structure.
         self.p_rot = self.p
-        self.u = np.zeros(shape=[self.n_dofs, 1], dtype=np.float64)
+        self.u = self._get_displacement_vector()
         self.u_rot = self.u
         self.km = self._calculate_km()  #modification due to rotated support.
         self.kmm = self._calculate_kmm() #modification due to elastic support.
@@ -36,7 +104,7 @@ class BaseStructure(ABC):
         """Calculates the global stiffness matrix."""
         kg = np.zeros(shape=[self.n_dofs, self.n_dofs], dtype=np.float64)
         for element in self.elements:
-            kg += element.get_element_contribution_to_kg(self.n_nodes)
+            kg += element.get_element_contribution_to_kg(self.n_dofs)
         return kg
 
     def _get_bounded_dofs(self) -> list[int]:
@@ -59,6 +127,18 @@ class BaseStructure(ABC):
         """Abstract method that returns a list with all the modifications that are needed due a rotated support."""
         pass
 
+    def _get_displacement_vector(self) -> np.ndarray[np.float64]:
+        u = np.zeros(shape=[self.n_dofs, 1], dtype=np.float64)
+        for inode, node in enumerate(self.nodes):
+            if node.get_support() is not None:
+                if node.get_support().get_retreats() is not None:
+                    for idof in range(self.n_dims):
+                        u[self.n_dims * inode + idof] = node.get_support().get_retreats()[idof]
+                    continue
+            for idof in range(self.n_dims):
+                u[self.n_dims * inode + idof] = 0
+        return u
+
     def _get_external_loading(self) -> np.ndarray[np.float64]:
         """Returns the vector of the external loads."""
         p_ext = np.zeros(shape=[self.n_dofs, 1], dtype=np.float64)
@@ -73,7 +153,7 @@ class BaseStructure(ABC):
         """Calculates the consolidation actions."""
         s = np.zeros(shape=[self.n_dofs,1], dtype=np.float64)
         for element in self.elements:
-            s += element.get_element_contribution_to_s(self.n_nodes)
+            s += element.get_element_contribution_to_s(self.n_dofs)
         return s
 
     def _calculate_km(self) -> np.ndarray[np.float64]:

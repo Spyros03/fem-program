@@ -19,6 +19,7 @@ class BaseElement(ABC):
             raise FemDefinitionError("Elements are defined by 2 nodes.")
         self.n_dims = n_dims
         self.nodes = nodes
+        self.n_nodes = len(nodes)
         self.material = material
         self.properties = properties
         self.intermediate_loads = intermediate_loads
@@ -26,6 +27,7 @@ class BaseElement(ABC):
         self.index = self._assign_index()
         self.length = self._calculate_length()
         self.transformation_matrix = self._calculate_transformation_matrix()
+        self.e = self._get_eccentricity()
         self.k = self._calculate_k()
         self.kbar = self._calculate_kbar()
 
@@ -34,18 +36,19 @@ class BaseElement(ABC):
         self.arbar = self._calculate_arbar()
         self.f = None #forces at the end of the element.
 
+
     def get_element_id(self) -> int:
         return self.element_id
 
-    def get_element_contribution_to_kg(self, n_nodes: int) -> np.ndarray[np.float64]:
+    def get_element_contribution_to_kg(self, n_dofs: int) -> np.ndarray[np.float64]:
         """Returns the contribution of the element to the global stiffness matrix."""
-        kg = np.zeros(shape=[self.n_dims * n_nodes, self.n_dims*n_nodes], dtype=np.float64)
+        kg = np.zeros(shape=[n_dofs, n_dofs], dtype=np.float64)
         kg[np.ix_(self.index, self.index)] = self.kbar
         return kg
 
-    def get_element_contribution_to_s(self, n_nodes: int) -> np.ndarray[np.float64]:
+    def get_element_contribution_to_s(self, n_dofs: int) -> np.ndarray[np.float64]:
         """Returns the contribution of the element to the global consolidation actions vector."""
-        s = np.zeros(shape=[self.n_dims * n_nodes, 1], dtype=np.float64)
+        s = np.zeros(shape=[n_dofs, 1], dtype=np.float64)
         s[self.index] = self.arbar
         return s
 
@@ -56,6 +59,10 @@ class BaseElement(ABC):
     @abstractmethod
     def _calculate_length(self) -> np.ndarray[np.float64]:
         """Abstract method that calculates the length of the element."""
+        pass
+
+    @abstractmethod
+    def _get_eccentricity(self):
         pass
 
     @abstractmethod
@@ -96,7 +103,7 @@ class BaseElement(ABC):
     def calculate_element_forces(self):
         """Calculates forces that are applied at the element's edge."""
         self.set_extreme_displacements()
-        self.f = self.ar + self.k @ self.transformation_matrix @ self.u
+        self.f = self.ar + self.k @ self.transformation_matrix @ self.e @ self.u
 
     def add_intermediate_load(self, intermediate_load: BaseInterLoad):
         """Adds an intermediate load to the element."""
@@ -149,6 +156,9 @@ class PlanarTrussElement(BaseElement):
         return np.hypot(self.nodes[1].get_coordinates()[0] - self.nodes[0].get_coordinates()[0],
                         self.nodes[1].get_coordinates()[1] - self.nodes[0].get_coordinates()[1])
 
+    def _get_eccentricity(self) -> np.ndarray:
+        return np.eye(self.n_nodes * self.n_dims, dtype=np.float64)
+
     def _calculate_transformation_matrix(self) -> np.ndarray[np.float64]:
         """Calculates the transformation matrix of a planar truss element"""
         dx = self.nodes[1].get_coordinates()[0] - self.nodes[0].get_coordinates()[0]
@@ -186,7 +196,6 @@ class PlanarTrussElement(BaseElement):
                                          [0, 0, 0, 0, 0, 0],
                                          [0, 0, 0, 0, 0, 0]])
 
-
     def calculate_element_forces(self):
         """(Temporary) Returns the axial force of the element."""
         super().calculate_element_forces()
@@ -200,13 +209,46 @@ class PlanarTrussElement(BaseElement):
 class PlanarBeamElement(BaseElement):
 
     def __init__(self, element_id: int, n_dims: int, nodes: list[Node], material: Material,
-                 properties: PlanarBeamProperties, intermediate_loads: list[BaseInterLoad] = None):
+                 properties: PlanarBeamProperties, intermediate_loads: list[BaseInterLoad] = None,
+                 deformable_element_start_coords: np.ndarray[np.float64] = None,
+                 deformable_element_end_coords: np.ndarray[np.float64] = None):
+        if deformable_element_start_coords is None:
+            self.deformable_element_start_coords = nodes[0].get_coordinates()
+        else:
+            self.deformable_element_start_coords = deformable_element_start_coords
+        if deformable_element_end_coords is None:
+            self.deformable_element_end_coords = nodes[1].get_coordinates()
+        else:
+            self.deformable_element_end_coords = deformable_element_end_coords
         super().__init__(element_id, n_dims, nodes, material, properties, intermediate_loads)
+        self.angle = None
 
     def _calculate_length(self) -> np.ndarray[np.float64]:
         """Implements the abstract method and calculates the length of a planar beam."""
-        return np.hypot(self.nodes[1].get_coordinates()[0] - self.nodes[0].get_coordinates()[0],
-                        self.nodes[1].get_coordinates()[1] - self.nodes[0].get_coordinates()[1])
+        return np.hypot(self.deformable_element_end_coords[0] - self.deformable_element_start_coords[0],
+                        self.deformable_element_end_coords[1] - self.deformable_element_start_coords[1])
+
+    def _get_eccentricity(self):
+        transformation_matrix = self.get_transformation_matrix()[np.ix_([0, 1], [0, 1])]
+        start_eccentricity_vector = transformation_matrix @ np.array([[self.deformable_element_start_coords[0]
+                                                                       - self.nodes[0].get_coordinates()[0]],
+                                                                      [self.deformable_element_start_coords[1]
+                                                                       - self.nodes[0].get_coordinates()[1]]])
+        end_eccentricity_vector = transformation_matrix @ np.array([[self.deformable_element_end_coords[0]
+                                                                    - self.nodes[1].get_coordinates()[0]],
+                                                                    [self.deformable_element_end_coords[1]
+                                                                    - self.nodes[1].get_coordinates()[1]]])
+        eccentricity = np.eye(6)
+        eccentricity[np.ix_([0, 1], [2])] = start_eccentricity_vector
+        eccentricity[np.ix_([3, 4], [5])] = end_eccentricity_vector
+        return eccentricity
+
+    def get_angle(self):
+        if self.angle is not None:
+            return self.angle
+        self.angle = np.arctan2(self.deformable_element_end_coords[0] - self.deformable_element_start_coords[0],
+                                self.deformable_element_end_coords[1] - self.deformable_element_start_coords[1])
+        return self.angle
 
     def _calculate_transformation_matrix(self) -> np.ndarray[np.float64]:
         """Calculates the transformation matrix of a planar beam element"""
@@ -227,10 +269,11 @@ class PlanarBeamElement(BaseElement):
         A = self.properties.get_area()
         I = self.properties.get_moment_of_inertia()
         L = self.length
-        return np.array([[E*A/L,         0,          0,        -E*A/L,         0,          0],
+        k = np.array([[E*A/L,         0,          0,        -E*A/L,         0,          0],
                          [0,       12*E*I/L/L/L,   6*E*I/L/L,      0,-12*E*I/L/L/L,  6*E*I/L/L],
                          [0,          6*E*I/L/L,     4*E*I/L,      0,   -6*E*I/L/L,    2*E*I/L],
                          [-E*A/L,             0,           0,  E*A/L,           0,           0],
                          [0,      -12*E*I/L/L/L,  -6*E*I/L/L,      0, 12*E*I/L/L/L, -6*E*I/L/L],
                          [0,          6*E*I/L/L,     2*E*I/L,      0,   -6*E*I/L/L,    4*E*I/L]], dtype=np.float64)
+        return self.e.transpose() @ k @ self.e
 
