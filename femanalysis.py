@@ -170,10 +170,48 @@ class PlanarFemAnalysis(BaseFemAnalysis):
     def analyze(self, draw: bool = False):
         self.structure = PlanarStructure(self.nodes, self.elements, self.n_dims)
         self.structure.analyze()
-        if draw:
-            draw_structure(False, self.elements, self.nodes)
-            draw_structure(True, self.elements, self.nodes)
+
+    def draw_structure(self):
+        draw_structure(False, self.elements, self.nodes)
+        draw_structure(True, self.elements, self.nodes)
 
     def print_results(self):
+        print("Nodal displacements")
+        print("-" * 45)
+        for node in self.nodes:
+            print("Node {:2d}".format(node.node_id + 1))
+            print("    x-axis displacement: {:9.4f}m".format(float(node.u[0])))
+            print("    y-axis displacement: {:9.4f}m".format(float(node.u[1])))
+            if self.n_dims > 2:
+                print("        z-axis rotation: {:9.4f}rad".format(float(node.u[2])))
+        print("Structure Reactions")
+        print("-" * 45)
+        for node in self.nodes:
+            if node.get_support() is None:
+                continue
+            print("Node {:d} support".format(node.node_id + 1))
+            print("    x-axis reaction force: {:9.4f}kN".format(float(self.structure.p_ext[node.index[0]])))
+            print("    y-axis reaction force: {:9.4f}kN".format(float(self.structure.p_ext[node.index[1]])))
+            if self.n_dims > 2:
+                print("   z-axis reaction moment: {:9.4f}kNm".format(float(self.structure.p_ext[node.index[2]])))
+        print("Extreme element actions")
+        print("-" * 45)
         for element in self.elements:
-            element.print_internal_forces()
+            print("Element {:2d}.".format(element.element_id))
+            if type(element) is PlanarTrussElement:
+                print("Start Node")
+                print("    Normal force: {:9.4f}kN".format(float(element.f[0])))
+                print("End Node")
+                if self.n_dims > 2:
+                    print("    Normal force: {:9.4f}kN".format(float(element.f[3])))
+                else:
+                    print("    Normal force: {:9.4f}kN".format(float(element.f[2])))
+            else:
+                print("Start Node")
+                print("      Normal force: {:9.4f}kN".format(float(element.f[0])))
+                print("       Shear force: {:9.4f}kN".format(float(element.f[1])))
+                print("    Bending moment: {:9.4f}kN".format(float(element.f[2])))
+                print("End Node")
+                print("      Normal force: {:9.4f}kN".format(float(element.f[3])))
+                print("       Shear force: {:9.4f}kN".format(float(element.f[4])))
+                print("    Bending moment: {:9.4f}kN".format(float(element.f[5])))

@@ -75,7 +75,6 @@ class BaseElement(ABC):
         """Abstract method that calculates the element's local stiffness matrix."""
         pass
 
-
     def _calculate_kbar(self) -> np.ndarray[np.float64]:
         """Returns the element's stiffness matrix transformed to the global coordinates system."""
         return self.transformation_matrix.transpose() @ self.e.transpose() @ self.k @ self.e @ self.transformation_matrix
@@ -158,7 +157,6 @@ class BaseElement(ABC):
         return self.nodes
 
 
-
 class PlanarTrussElement(BaseElement):
     """Class of a planar truss element."""
     def __init__(self, element_id: int, n_dims: int, nodes: list[Node], material: Material,
@@ -212,15 +210,6 @@ class PlanarTrussElement(BaseElement):
                                         [-1, 0, 0,  1, 0, 0],
                                          [0, 0, 0,  0, 0, 0],
                                          [0, 0, 0,  0, 0, 0]])
-
-    def calculate_element_forces(self):
-        """(Temporary) Returns the axial force of the element."""
-        super().calculate_element_forces()
-        self.axial_force = -self.f[0]
-
-    def print_internal_forces(self):
-        """Temp method to get the outputs."""
-        print("Element {:2d} axial load is {:9.4f} kN".format(self.element_id, float(self.axial_force)))
 
 
 class PlanarBeamElement(BaseElement):
