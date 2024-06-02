@@ -9,7 +9,8 @@ from femelement import *
 
 class BaseStructure(ABC):
     """A base class for a structure."""
-    def __init__(self, nodes: list[BaseNode], elements: list[BaseElement], n_dims: int):
+
+    def __init__(self, nodes: list[Node], elements: list[BaseElement], n_dims: int):
         """Constructor that declares and initializes all structures variables."""
         self.nodes = nodes
         self.elements = elements
@@ -26,7 +27,7 @@ class BaseStructure(ABC):
         self.s = self._calculate_s() #consolidation actions vector.
         self.p = self.p_ext - self.s #nodal loads for the equivalent structure.
         self.p_rot = self.p
-        self.u = np.zeros(shape=[self.n_dofs, 1], dtype=np.float64)
+        self.u = self._get_displacement_vector()
         self.u_rot = self.u
         self.km = self._calculate_km()  #modification due to rotated support.
         self.kmm = self._calculate_kmm() #modification due to elastic support.
@@ -36,7 +37,7 @@ class BaseStructure(ABC):
         """Calculates the global stiffness matrix."""
         kg = np.zeros(shape=[self.n_dofs, self.n_dofs], dtype=np.float64)
         for element in self.elements:
-            kg += element.get_element_contribution_to_kg(self.n_nodes)
+            kg += element.get_element_contribution_to_kg(self.n_dofs)
         return kg
 
     def _get_bounded_dofs(self) -> list[int]:
@@ -59,6 +60,18 @@ class BaseStructure(ABC):
         """Abstract method that returns a list with all the modifications that are needed due a rotated support."""
         pass
 
+    def _get_displacement_vector(self) -> np.ndarray[np.float64]:
+        u = np.zeros(shape=[self.n_dofs, 1], dtype=np.float64)
+        for inode, node in enumerate(self.nodes):
+            if node.get_support() is not None:
+                if node.get_support().get_retreats() is not None:
+                    for idof in range(self.n_dims):
+                        u[self.n_dims * inode + idof] = node.get_support().get_retreats()[idof]
+                    continue
+            for idof in range(self.n_dims):
+                u[self.n_dims * inode + idof] = 0
+        return u
+
     def _get_external_loading(self) -> np.ndarray[np.float64]:
         """Returns the vector of the external loads."""
         p_ext = np.zeros(shape=[self.n_dofs, 1], dtype=np.float64)
@@ -73,7 +86,7 @@ class BaseStructure(ABC):
         """Calculates the consolidation actions."""
         s = np.zeros(shape=[self.n_dofs,1], dtype=np.float64)
         for element in self.elements:
-            s += element.get_element_contribution_to_s(self.n_nodes)
+            s += element.get_element_contribution_to_s(self.n_dofs)
         return s
 
     def _calculate_km(self) -> np.ndarray[np.float64]:
@@ -171,10 +184,10 @@ class BaseStructure(ABC):
         return self.kmmm
 
 
-class PlanarTrussStructure(BaseStructure):
+class PlanarStructure(BaseStructure):
     """A class for a planar truss structure."""
-    def __init__(self, nodes: list[PlanarTrussNode], elements: list[PlanarTrussElement]):
-        super().__init__(nodes, elements, 2)
+    def __init__(self, nodes: list[Node], elements: list[PlanarTrussElement], n_dims: int):
+        super().__init__(nodes, elements, n_dims)
 
     def _calculate_rotation_matrices(self) -> list[np.ndarray[np.float64]]:
         """Calculated the rotations matrices due to a rotated support."""
@@ -188,7 +201,11 @@ class PlanarTrussStructure(BaseStructure):
             angle = node.get_support().get_angles()[0]
             cos_angle = np.cos(np.pi/180 * angle)
             sin_angle = np.sin(np.pi/180 * angle)
-            r[np.ix_(node.get_index(), node.get_index())] = (
-                np.array([[cos_angle, sin_angle], [-sin_angle, cos_angle]]))
+            if self.n_dims == 2:
+                r[np.ix_(node.get_index(), node.get_index())] = (
+                    np.array([[cos_angle, sin_angle], [-sin_angle, cos_angle]]))
+            if self.n_dims == 3:
+                r[np.ix_(node.get_index(), node.get_index())] = (
+                    np.array([[cos_angle, sin_angle, 0], [-sin_angle, cos_angle, 0], [0, 0, 1]]))
             rotations.append(r)
         return rotations

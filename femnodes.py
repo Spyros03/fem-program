@@ -6,7 +6,7 @@ from femexceptions import *
 """Definition of boundary conditions."""
 
 
-class BaseSupport(ABC):
+class Support(ABC):
     """Base class of a structure's support."""
     def __init__(self, restrictions: list[bool], angles: np.ndarray[np.float64] = None,
                  springs: np.ndarray[np.float64] = None, retreats: np.ndarray[np.float64] = None):
@@ -28,26 +28,14 @@ class BaseSupport(ABC):
         return self.retreats
 
 
-class PlanarTrussSupport(BaseSupport):
-    """A class that resembles a planar truss support."""
-
-    def __init__(self, restrictions: list[bool], angles: np.ndarray[np.float64] = None,
-                 springs: np.ndarray[np.float64] = None, retreats: np.ndarray[np.float64] = None):
-        super().__init__(restrictions, angles, springs, retreats)
-
-
 """Definition of FEM nodes."""
 
 
-class BaseNode(ABC):
-    """Base class for a finite element method node."""
+class Node:
+    """A class representing a node of a structure."""
     def __init__(self, node_id: int, n_dims: int, coordinates: np.ndarray[np.float64] = None,
-                 external_loads: np.ndarray[np.float64] = None, support: BaseSupport = None):
-        if not len(coordinates) == n_dims:
-            raise FemDimensionError("Planar truss nodes are defined by 2 coordinates.")
-        if external_loads is not None:
-            if not len(external_loads) == n_dims:
-                raise FemDimensionError("Planar truss nodes are loaded in 2 directions.")
+                 external_loads: np.ndarray[np.float64] = None, support: Support = None,
+                 free_rotation: bool = False):
         self.node_id = node_id
         self.coordinates = coordinates
         self.p = external_loads  #External loads vector
@@ -56,6 +44,7 @@ class BaseNode(ABC):
         self.index = self._assign_indexes()
         self.u = None  #Displacement vector
         self.bounded_dofs = self._assign_bounded_dofs()
+        self.free_rotation = free_rotation
 
     def _assign_indexes(self) -> list[int]:
         """Returns the global degrees of freedom that are contained in this node."""
@@ -105,7 +94,7 @@ class BaseNode(ABC):
         """Setter for nodal displacement vector."""
         self.u = u
 
-    def set_support(self, support: BaseSupport):
+    def set_support(self, support: Support):
         """Setter for the support of the node."""
         self.support = support
         self.bounded_dofs = self._assign_bounded_dofs()
@@ -119,12 +108,8 @@ class BaseNode(ABC):
     def get_external_load(self) -> np.ndarray[np.float64]:
         return self.p
 
-    def get_support(self) -> BaseSupport:
+    def get_support(self) -> Support:
         return self.support
 
-
-class PlanarTrussNode(BaseNode):
-
-    def __init__(self, node_id: int, coordinates: np.ndarray[np.float64], external_loads: np.ndarray[np.float64] = None,
-                 support: PlanarTrussSupport = None):
-        super().__init__(node_id, 2, coordinates, external_loads, support)
+    def is_rotation_free(self) -> bool:
+        return self.free_rotation

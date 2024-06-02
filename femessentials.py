@@ -20,14 +20,33 @@ class Material:
 
 class BaseProperties(ABC):
     """This is a base class that contains geometric properties."""
-    pass
+    def __init__(self, name):
+        self.name = name
 
 
 class PlanarTrussProperties(BaseProperties):
     """Contains the geometric properties(area) of a planar truss structure."""
     def __init__(self, name: str, area: np.float64):
-        self.name = name
+        super().__init__(name)
         self.area = area
 
     def get_area(self) -> np.float64:
         return self.area
+
+
+class PlanarBeamProperties(BaseProperties):
+
+    def __init__(self, name: str, area: np.float64, moment_of_inertia: np.float64, height: np.float64 = None):
+        super().__init__(name)
+        self.area = area
+        self.moment_of_inertia = moment_of_inertia
+        self.height = height
+
+    def get_area(self) -> np.float64:
+        return self.area
+
+    def get_moment_of_inertia(self) -> np.float64:
+        return self.moment_of_inertia
+
+    def get_height(self) -> np.float64:
+        return self.height
