@@ -6,77 +6,10 @@ import numpy as np
 from femnodes import *
 from femelement import *
 
-class IndexManager:
-
-    class NodeIndexProperties:
-
-        def __init__(self):
-            self.indexes = list()
-            self.connected_elements = 0
-            self.bounded_dofs = list()
-            self.already_connected_elements = 0
-
-    def __init__(self, nodes, elements, n_dims):
-        self.n_dims = 0
-        self.nodes = nodes
-        self.n_nodes = len(self.nodes)
-        self.elements = elements
-        self.node_dofs = list()
-        self.node_bounded_dofs = list()
-        self.element_dofs = list()
-        for i in range(self.n_nodes):
-            self.node_dofs.append(NodeIndexProperties())
-            self.node_bounded_dofs.append(list())
-            self.element_dofs.append(list())
-
-    def assign_node_dofs(self):
-        current_dof = 0
-        for inode, node in enumerate(self.nodes):
-            if node.get_freedoms() is None:
-                for idof in range(self.n_dims):
-                    self.node_dofs[inode].index.append(current_dof)
-                    current_dof += 1
-            else:
-                self.node_dofs[inode].connected_elements = self._get_number_of_connected_elements(node)
-                for idof in range(self.n_dims):
-                    if idof in node.get_freedoms():
-                        for i in range(self.node_dofs[inode].connected_elements):
-                            self.node_dofs[inode].index.append(current_dof)
-                            current_dof += 1
-                    else:
-                        self.node_dofs[inode].index.append(current_dof)
-                        current_dof += 1
-
-    def _assign_bounded_dofs(self) -> list[int]:
-        """Returns the global degrees of freedom that are bounded by the support of this node."""
-        for inode, node in enumerate(self.nodes):
-            if node.get_support() is None:
-                continue
-            if node.get_freedoms() is None:
-                for idof, restriction in enumerate(node.get_support().get_restrictions()):
-                    if restriction:
-                        self.node_dofs[inode].bounded_dofs.append(self.node_dofs[inode].index[idof])
-            else:
-                pass
-
-    def assign_element_dofs(self):
-        pass
-
-    def _get_number_of_connected_elements(self, node) -> int:
-        count = 0
-        for element in self.elements:
-            for element_node in element.get_nodes():
-                if element_node is node:
-                    count += 1
-        return count
-
-
-
-
-
 
 class BaseStructure(ABC):
     """A base class for a structure."""
+
     def __init__(self, nodes: list[Node], elements: list[BaseElement], n_dims: int):
         """Constructor that declares and initializes all structures variables."""
         self.nodes = nodes
@@ -268,7 +201,11 @@ class PlanarStructure(BaseStructure):
             angle = node.get_support().get_angles()[0]
             cos_angle = np.cos(np.pi/180 * angle)
             sin_angle = np.sin(np.pi/180 * angle)
-            r[np.ix_(node.get_index(), node.get_index())] = (
-                np.array([[cos_angle, sin_angle], [-sin_angle, cos_angle]]))
+            if self.n_dims == 2:
+                r[np.ix_(node.get_index(), node.get_index())] = (
+                    np.array([[cos_angle, sin_angle], [-sin_angle, cos_angle]]))
+            if self.n_dims == 3:
+                r[np.ix_(node.get_index(), node.get_index())] = (
+                    np.array([[cos_angle, sin_angle, 0], [-sin_angle, cos_angle, 0], [0, 0, 1]]))
             rotations.append(r)
         return rotations

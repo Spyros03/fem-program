@@ -4,6 +4,7 @@ and implement the get_consolidation_actions method distinct for every type of in
 import numpy as np
 from abc import ABC, abstractmethod
 
+from femelement import PlanarBeamElement, PlanarBeamElementT1, PlanarBeamElementT2
 
 class BaseInterLoad(ABC):
     """Base class of intermediate loads."""
@@ -71,34 +72,49 @@ class PlanarUniformDistributedLoad(BaseInterLoad):
 
     def get_consolidation_actions(self, element):
         load_angle = element.get_angle() - self.angle
-        q1 = self.load_value * np.sin(load_angle) * np.cos(load_angle)
-        q2 = self.load_value * np.cos(load_angle)**2
+        q1 = self.load_value * np.sin(load_angle * np.pi/180) * np.cos(load_angle * np.pi/180)
+        q2 = self.load_value * np.cos(load_angle * np.pi/180)**2
         l = element.get_length()
-        deformable_body_actions = element.e.transpose() @ np.array([[q1*l/2],
-                                                                    [q2*l/2],
-                                                                    [q2*l*l/12],
-                                                                    [q1*l/2],
-                                                                    [q2*l/2],
-                                                                    [q2*l*l/12]])
+        if type(element) is PlanarBeamElement:
+            deformable_body_actions = element.e.transpose() @ np.array([[q1*l/2],
+                                                                        [q2*l/2],
+                                                                        [q2*l*l/12],
+                                                                        [q1*l/2],
+                                                                        [q2*l/2],
+                                                                        [-q2*l*l/12]])
+        elif type(element) is PlanarBeamElementT1:
+            deformable_body_actions = element.e.transpose() @ np.array([[q1 * l / 2],
+                                                                        [3 * q2 * l / 8],
+                                                                        [0],
+                                                                        [q1 * l / 2],
+                                                                        [5 * q2 * l / 8],
+                                                                        [-q2 * l * l / 8]])
+        elif type(element) is PlanarBeamElementT2:
+            deformable_body_actions = element.e.transpose() @ np.array([[q1 * l / 2],
+                                                                        [5 * q2 * l / 8],
+                                                                        [q2 * l * l / 8],
+                                                                        [q1 * l / 2],
+                                                                        [3 * q2 * l / 8],
+                                                                        [0]])
         if not self.is_acting_on_solid_body:
             return deformable_body_actions
         return deformable_body_actions + self._get_solid_node_actions(element)
 
     def _get_solid_node_actions(self, element):
-        start_solid_node = element.get_nodes()[0].get_coordinates
-        start_deformable_node = element.deformalbe_element_start_cords
-        end_solid_node = element.get_nodes()[1].get_coordinates
-        end_deformable_node = element.deformalbe_element_end_cords
+        start_solid_node = element.get_nodes()[0].get_coordinates()
+        start_deformable_node = element.deformable_element_start_coords
+        end_solid_node = element.get_nodes()[1].get_coordinates()
+        end_deformable_node = element.deformable_element_end_coords
         start_vector = start_deformable_node - start_solid_node
         end_vector = end_deformable_node - end_solid_node
         start_length = np.hypot(start_vector[0], start_vector[1])
-        start_angle = np.arctan2(start_vector[1], start_vector[0]) - self.angle
+        start_angle = np.arctan2(start_vector[1], start_vector[0]) * 180 / np.pi - self.angle
         end_length = np.hypot(end_vector[0], end_vector[1])
-        end_angle = np.arctan2(end_vector[1], end_vector[0]) - self.angle
-        q1_start = self.load_value * np.sin(start_angle) * np.cos(start_angle)
-        q2_start = self.load_value * np.cos(start_angle) ** 2
-        q1_end = self.load_value * np.sin(start_angle) * np.cos(start_angle)
-        q2_end = self.load_value * np.cos(start_angle) ** 2
+        end_angle = np.arctan2(end_vector[1], end_vector[0]) * 180 / np.pi - self.angle
+        q1_start = self.load_value * np.sin(start_angle * np.pi/180) * np.cos(start_angle * np.pi/180)
+        q2_start = self.load_value * np.cos(start_angle * np.pi/180) ** 2
+        q1_end = self.load_value * np.sin(end_angle * np.pi/180) * np.cos(end_angle * np.pi/180)
+        q2_end = self.load_value * np.cos(end_angle * np.pi/180) ** 2
         return np.array([[q1_start*start_length],
                          [q2_start*start_length],
                          [q2_start*start_length*start_length/2],
@@ -118,9 +134,24 @@ class PlanarLinearTemperatureDifference(BaseInterLoad):
         I = element.get_properties().get_moment_of_inertia()
         E = element.get_material().get_e_young()
         a = element.get_material().get_a_thermal()
-        return element.e.transpose() @ np.array([[0],
-                                                [0],
-                                                [E*I*a*DT/h],
-                                                [0],
-                                                [0],
-                                                [-E*I*a*DT/h]])
+        if type(element) is PlanarBeamElement:
+            return element.e.transpose() @ np.array([[0],
+                                                    [0],
+                                                    [E*I*a*DT/h],
+                                                    [0],
+                                                    [0],
+                                                    [-E*I*a*DT/h]])
+        elif type(element) is PlanarBeamElementT1:
+            return element.e.transpose() @ np.array([[0],
+                                                     [0],
+                                                     [],
+                                                     [0],
+                                                     [0],
+                                                     [-1.5 * E * I * a * DT / h]])
+        elif type(element) is PlanarBeamElementT2:
+            return element.e.transpose() @ np.array([[0],
+                                                     [0],
+                                                     [1.5 * E * I * a * DT / h],
+                                                     [0],
+                                                     [0],
+                                                     [0]])

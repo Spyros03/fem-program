@@ -3,7 +3,7 @@ from femanalysis import *
 from input_File_Thema_1_1 import analysis as analysis1
 from input_File_Thema_1_2 import analysis as analysis2
 from input_File_Thema_1_3 import analysis as analysis3
-from input_File_Thema_2_test import analysis as testanalysis
+from input_File_Thema_2 import analysis as analysis4
 
 
 if __name__ == "__main__":
@@ -25,9 +25,9 @@ if __name__ == "__main__":
     analysis3.print_results()
     print("")
 
-    print("Test Kamptomenos")
+    print("Thema 2")
     print("-" * 45)
-    testanalysis.analyze(True)
+    analysis4.analyze(True)
     print("")
 
     print("Analysis is Finished.")

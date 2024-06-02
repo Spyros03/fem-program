@@ -35,16 +35,16 @@ class Node:
     """A class representing a node of a structure."""
     def __init__(self, node_id: int, n_dims: int, coordinates: np.ndarray[np.float64] = None,
                  external_loads: np.ndarray[np.float64] = None, support: Support = None,
-                 freedoms: list[int] = None):
+                 free_rotation: bool = False):
         self.node_id = node_id
         self.coordinates = coordinates
         self.p = external_loads  #External loads vector
         self.support = support
         self.n_dims = n_dims
-        self.freedoms = freedoms
         self.index = self._assign_indexes()
         self.u = None  #Displacement vector
         self.bounded_dofs = self._assign_bounded_dofs()
+        self.free_rotation = free_rotation
 
     def _assign_indexes(self) -> list[int]:
         """Returns the global degrees of freedom that are contained in this node."""
@@ -111,5 +111,5 @@ class Node:
     def get_support(self) -> Support:
         return self.support
 
-    def get_freedoms(self):
-        return self.freedoms
+    def is_rotation_free(self) -> bool:
+        return self.free_rotation
